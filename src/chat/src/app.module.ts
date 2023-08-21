@@ -44,8 +44,8 @@ import { UserService } from './user/services/user.service';
         },
       ],
       enableControllerDiscovery: true,
-      connectionInitOptions: { timeout: 20000 },
-      defaultRpcTimeout: 20000,
+      connectionInitOptions: { timeout: 60000 },
+      defaultRpcTimeout: 60000,
     }),
     TypeOrmModule.forRoot({
       type: 'postgres',
