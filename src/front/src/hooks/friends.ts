@@ -4,7 +4,7 @@ import { useSocketRef } from '@/hooks/chat';
 import { Friend } from '@/hooks/query/friends';
 
 export function useFriendsStatusSocket() {
-  const socketRef = useSocketRef(`ws://${import.meta.env.VITE_BASE_URL}:9994`);
+  const socketRef = useSocketRef(`ws://${import.meta.env.VITE_STATE_WS_URL}`);
   const queryClient = useQueryClient();
 
   useEffect(() => {

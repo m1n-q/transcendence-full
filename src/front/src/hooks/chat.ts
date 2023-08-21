@@ -20,7 +20,7 @@ interface SubscribeData {
 
 export function useChat(roomId: string) {
   const queryClient = useQueryClient();
-  const socketRef = useSocketRef(`ws://${import.meta.env.VITE_BASE_URL}:9999`);
+  const socketRef = useSocketRef(`ws://${import.meta.env.VITE_CHAT_WS_URL}`);
 
   useEffect(() => {
     const socket = socketRef.current;

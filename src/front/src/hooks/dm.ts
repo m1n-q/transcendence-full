@@ -15,7 +15,7 @@ interface SubscribeData {
 
 export function useDirectMessageSocket(opponent: string) {
   const queryClient = useQueryClient();
-  const socketRef = useSocketRef(`ws://${import.meta.env.VITE_BASE_URL}:9992`);
+  const socketRef = useSocketRef(`ws://${import.meta.env.VITE_DM_WS_URL}`);
   const setDmHistory = useSetRecoilState(dmHistoryState);
 
   useEffect(() => {

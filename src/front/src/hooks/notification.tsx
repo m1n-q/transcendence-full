@@ -22,7 +22,7 @@ interface NotificationResponse<T extends object> {
 }
 
 export function useNotification() {
-  const socketRef = useSocketRef(`ws://${import.meta.env.VITE_BASE_URL}:1234`);
+  const socketRef = useSocketRef(`ws://${import.meta.env.VITE_NOTI_WS_URL}`);
   const queryClient = useQueryClient();
   const setDmHistory = useSetRecoilState(dmHistoryState);
   const currentOpponent = useRecoilValue(currentDMOpponentState);

@@ -24,9 +24,7 @@ export type GameStatus =
 const GameContainer = () => {
   const [currentStatus, setCurrentStatus] = useRecoilState(currentGameStatus);
 
-  const API_URL = import.meta.env.VITE_BASE_URL;
-
-  const gameSocketUri = `ws://${API_URL}:9998`;
+  const gameSocketUri = `ws://${import.meta.env.VITE_GAME_WS_URL}`;
   const accessToken = useRecoilValue(accessTokenState);
 
   const gameSocketManager = GameSocketManager.getInstance();
