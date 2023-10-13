@@ -10,7 +10,7 @@ import {
   WebSocketServer,
   WsException,
 } from '@nestjs/websockets';
-import { Socket, Server, BroadcastOperator } from 'socket.io';
+import { BroadcastOperator, Server, Socket } from 'socket.io';
 import { AmqpConnection } from '@golevelup/nestjs-rabbitmq';
 import { ConsumeMessage } from 'amqplib';
 import { RmqEvent } from '../common/rmq/types/rmq-event';
@@ -22,22 +22,22 @@ import { ChatService } from './services/chat.service';
 import { MessageType } from './dto/chat-room-message.dto';
 import { DefaultEventsMap } from 'socket.io/dist/typed-events';
 import {
-  EventCommand,
   CommandFactory,
+  EventCommand,
   RoutingKeyParams,
 } from './types/chat-event-command';
 import {
   ChatAnnouncementFromServer,
+  ChatMessageFromServer,
   ChatPayloadFormat,
   ChatPayloadFromClient,
-  ChatMessageFromServer,
 } from './types/chat-message-format';
 import { UserProfile } from '../user/types/user-profile';
 import { toUserProfile } from '../common/utils/utils';
 import { UserService } from '../user/services/user.service';
 
 @UseFilters(new WsExceptionsFilter())
-@WebSocketGateway(9999, { cors: true })
+@WebSocketGateway({ cors: true })
 export class ChatGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
@@ -63,12 +63,12 @@ export class ChatGateway
   //@======================================================================@//
 
   async afterInit(server: Server) {
-    /* when last user of chat-room on this ws-instance exit, delete room-queue */
+    /* when last user of chat-room on this ws-instance exit, delete room exchange */
     server.of('/').adapter.on('delete-room', async (room) => {
       try {
-        await this.amqpConnection.channel.deleteQueue(this.roomQ(room));
+        await this.amqpConnection.channel.deleteExchange(this.roomFX(room));
       } catch (e) {
-        console.log(`Failed to delete ${this.roomQ(room)}`);
+        console.log(`Failed to delete ${this.serverQ()}`);
       }
     });
   }
@@ -113,6 +113,7 @@ export class ChatGateway
   ) {
     socket.emit('subscribe', payload);
   }
+
   echoMessage(
     socket: Socket | BroadcastOperator<DefaultEventsMap, null>,
     payload: ChatMessageFromServer,
@@ -144,37 +145,34 @@ export class ChatGateway
     const room = message.room;
     await clientSocket.join(room);
 
-    /* queue per room-event */
-    const roomQueue = await this.amqpConnection.channel.assertQueue(
-      this.roomQ(room),
+    /* Fanout per room */
+    const roomExchange = await this.amqpConnection.channel.assertExchange(
+      this.roomFX(room),
+      'fanout',
       {
         autoDelete: true /* delete if no handler */,
       },
     );
     /* only one consumer(handler) per room */
-    if (!roomQueue.consumerCount) {
-      await this.amqpConnection
-        .createSubscriber(
-          (msg: RmqEvent, rawMsg) => this.chatRoomEventHandler(msg, rawMsg), // to bind "this", need arrow function
-          {
-            exchange: this.roomTX(),
-            queue: this.roomQ(room) /* subscriber */,
-            routingKey: [
-              this.roomRK('message', room),
-              this.roomRK('announcement', room),
-              this.roomRK('ban', room),
-            ],
-            errorHandler: (c, m, e) => this.logger.error(e),
-            queueOptions: {
-              autoDelete: true,
-            },
+    await this.amqpConnection
+      .createSubscriber(
+        (msg: RmqEvent, rawMsg) => this.chatRoomEventHandler(msg, rawMsg), // to bind "this", need arrow function
+        {
+          exchange: this.roomFX(room),
+          queue: this.serverQ() /* subscriber */,
+          routingKey: [
+            this.roomRK('message', room),
+            this.roomRK('announcement', room),
+            this.roomRK('ban', room),
+          ],
+          errorHandler: (c, m, e) => this.logger.error(e),
+          queueOptions: {
+            autoDelete: true,
           },
-          'chatRoomEventHandler',
-        )
-        .catch((e) => {
-          console.log(e);
-        });
-    }
+        },
+        'chatRoomEventHandler',
+      )
+      .catch(console.error);
   }
 
   @SubscribeMessage('publish')
@@ -210,7 +208,7 @@ export class ChatGateway
 
     /* To all WS instances */
     this.amqpConnection.publish(
-      this.roomTX(),
+      this.roomFX(message.room),
       this.roomRK('message', message.room),
       new RmqEvent(new ChatMessageFromServer(sender, stored.message)),
     );
@@ -249,6 +247,7 @@ export class ChatGateway
       chat_sock: sockId,
     });
   }
+
   async getConnSocketId(userId: string) {
     return this.redisService.hget(this.makeUserKey(userId), 'chat_sock');
   }
@@ -261,12 +260,12 @@ export class ChatGateway
     return clientSocket['user_profile'];
   }
 
-  roomTX() {
-    return process.env.RMQ_CHAT_ROOM_TOPIC;
+  roomFX(roomId) {
+    return `chat-room.${roomId}.f.x`;
   }
 
-  roomQ(roomId: string) {
-    return `chat-room.${roomId}.${this.serverId}.q`;
+  serverQ() {
+    return `chat-room.${this.serverId}.q`;
   }
 
   roomRK(eventName: string, roomId: string) {

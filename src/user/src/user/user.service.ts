@@ -21,6 +21,7 @@ import { TwoFactorAuthenticationInfo } from './2fa-info';
 import { TwoFactorAuthenticationUpdateDto } from './dto/2fa-update.dto';
 
 const WHERE = 'user_service';
+
 @Injectable()
 export class UserService {
   constructor(
@@ -142,11 +143,7 @@ export class UserService {
 
   async setUserState(payload: RmqUserStateDto): Promise<UserState> {
     const { user_id, state } = payload;
-    const event: RmqEvent = {
-      recvUsers: [],
-      data: state,
-      created: new Date(),
-    };
+    const event: RmqEvent = new RmqEvent(state, []);
     try {
       switch (state) {
         case UserState.ONLINE:
