@@ -1,8 +1,5 @@
 # Transcendence
 
-## TODO
-
-이미지 추가하기
 
 ## 주요 기능
 
